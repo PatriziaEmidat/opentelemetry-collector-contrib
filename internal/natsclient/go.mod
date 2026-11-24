@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/nats-io/jwt/v2 v2.8.3
 	github.com/nats-io/nats-server/v2 v2.15.3
-	github.com/nats-io/nats.go v1.55.0
+	github.com/nats-io/nats.go v1.56.0
 	github.com/nats-io/nkeys v0.4.17
 	github.com/stretchr/testify v1.12.1
 	go.opentelemetry.io/collector/config/configopaque v1.71.1-0.20261122191605-d56d0a1c98b6
