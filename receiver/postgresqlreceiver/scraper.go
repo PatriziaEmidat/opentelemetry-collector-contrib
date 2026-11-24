@@ -73,6 +73,8 @@ type postgreSQLScraper struct {
 	excludedDatabases []string
 	excludes          map[string]struct{}
 	cache             *lru.Cache[string, float64]
+	// pg_stat_statements counters are cumulative, so the first top query scrape only seeds the cache.
+	topQueryBaselineSet bool
 	// if enabled, uses a separated attribute for the schema
 	separateSchemaAttr     bool
 	useOTelSemconv         bool
@@ -565,6 +567,11 @@ func (p *postgreSQLScraper) collectTopQuery(ctx context.Context, clientFactory p
 			Index:    i,
 		}
 		pq.Push(&item)
+	}
+
+	if !p.topQueryBaselineSet {
+		p.topQueryBaselineSet = true
+		return
 	}
 
 	heap.Init(&pq)

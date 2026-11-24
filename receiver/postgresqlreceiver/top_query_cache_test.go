@@ -37,6 +37,7 @@ func TestTopQueryCacheRetainsFetchedStatements(t *testing.T) {
 
 	scraper, err := newTopQueryScraper(receivertest.NewNopSettings(metadata.Type), cfg, mockSimpleClientFactory{db: db})
 	require.NoError(t, err)
+	scraper.topQueryBaselineSet = true
 
 	ids := make([]int, 500)
 	for i := range ids {
@@ -128,6 +129,7 @@ func TestTopQueryCacheSeparatesDatabaseAndRole(t *testing.T) {
 
 	scraper, err := newTopQueryScraper(receivertest.NewNopSettings(metadata.Type), cfg, mockSimpleClientFactory{db: db})
 	require.NoError(t, err)
+	scraper.topQueryBaselineSet = true
 
 	rows := sqlmock.NewRows(columns)
 	for _, identity := range []struct {
@@ -257,6 +259,7 @@ func TestTopQueryPlanCacheSeparatesDatabaseAndRole(t *testing.T) {
 	factory := &recordingClientFactory{mockSimpleClientFactory: mockSimpleClientFactory{db: db}}
 	scraper, err := newTopQueryScraper(receivertest.NewNopSettings(metadata.Type), cfg, factory)
 	require.NoError(t, err)
+	scraper.topQueryBaselineSet = true
 
 	// Distinct mocked plans let us verify attribution independently of how the
 	// database would plan the query under the receiver's connection credentials.
@@ -366,6 +369,7 @@ func TestTopQueryPlanCacheSeparatesDroppedRoles(t *testing.T) {
 
 	scraper, err := newTopQueryScraper(receivertest.NewNopSettings(metadata.Type), cfg, mockSimpleClientFactory{db: db})
 	require.NoError(t, err)
+	scraper.topQueryBaselineSet = true
 
 	statements := []struct {
 		userid string

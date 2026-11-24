@@ -1461,6 +1461,7 @@ func TestScrapeTopQueries(t *testing.T) {
 	queryid := "114514"
 	scraper, scraperErr := newPostgreSQLScraper(settings, cfg, factory, newCache(30), newTTLCache[string](1, time.Second))
 	require.NoError(t, scraperErr)
+	scraper.topQueryBaselineSet = true
 	cacheKeyPrefix := "postgres\x0016415\x00" + queryid + "\x00"
 	scraper.cache.Add(cacheKeyPrefix+totalExecTimeColumnName, 10)
 	scraper.cache.Add(cacheKeyPrefix+totalPlanTimeColumnName, 11)
@@ -1518,6 +1519,56 @@ func TestScrapeTopQueries(t *testing.T) {
 	assert.Equal(t, float64(12), planTime)
 }
 
+// TestScrapeTopQueriesFirstScrapeOnlySetsBaseline guards against reporting cumulative
+// pg_stat_statements totals as one interval after a collector restart.
+func TestScrapeTopQueriesFirstScrapeOnlySetsBaseline(t *testing.T) {
+	cfg := createDefaultConfig().(*Config)
+	cfg.Databases = []string{}
+	cfg.LogsBuilderConfig.Events.DbServerTopQuery.Enabled = true
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer db.Close()
+
+	scraper, err := newPostgreSQLScraper(receivertest.NewNopSettings(metadata.Type), cfg, mockSimpleClientFactory{db: db}, newCache(30), newTTLCache[string](1, time.Second))
+	require.NoError(t, err)
+
+	row := func(calls, totalExecTime string) *sqlmock.Rows {
+		return newSQLMockRows(topQueryColumns, map[string]any{
+			callsColumnName:             calls,
+			"datname":                   "postgres",
+			sharedBlksDirtiedColumnName: "0",
+			sharedBlksHitColumnName:     "0",
+			sharedBlksReadColumnName:    "0",
+			sharedBlksWrittenColumnName: "0",
+			tempBlksReadColumnName:      "0",
+			tempBlksWrittenColumnName:   "0",
+			"query":                     "select 1",
+			queryidColumnName:           "114514",
+			"userid":                    "16415",
+			"rolname":                   "app",
+			rowsColumnName:              "0",
+			totalExecTimeColumnName:     totalExecTime,
+			totalPlanTimeColumnName:     "0",
+		})
+	}
+
+	mock.ExpectQuery(expectedScrapeTopQuery).WillReturnRows(row("340000", "2300000"))
+	first, err := scraper.scrapeTopQuery(t.Context(), 31, 32, 0, 0)
+	require.NoError(t, err)
+	assert.Equal(t, 0, first.LogRecordCount())
+
+	mock.ExpectQuery(expectedScrapeTopQuery).WillReturnRows(row("340036", "2302500"))
+	second, err := scraper.scrapeTopQuery(t.Context(), 31, 32, 0, 0)
+	require.NoError(t, err)
+	require.Equal(t, 1, second.LogRecordCount())
+	attrs := second.ResourceLogs().At(0).ScopeLogs().At(0).LogRecords().At(0).Attributes()
+	calls, _ := attrs.Get("postgresql.calls")
+	assert.Equal(t, int64(36), calls.Int())
+	execTime, _ := attrs.Get("postgresql.total_exec_time")
+	assert.Equal(t, 2.5, execTime.Double())
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 // TestScrapeTopQueriesDbServerQueryPlanEvent covers both sides of the db.server.query_plan switch.
 func TestScrapeTopQueriesDbServerQueryPlanEvent(t *testing.T) {
 	newScraper := func(t *testing.T, topQueryEnabled, queryPlanEnabled bool) (*postgreSQLScraper, sqlmock.Sqlmock) {
@@ -1537,6 +1588,7 @@ func TestScrapeTopQueriesDbServerQueryPlanEvent(t *testing.T) {
 
 		scraper, scraperErr := newPostgreSQLScraper(settings, cfg, mockSimpleClientFactory{db: db}, newCache(30), newTTLCache[string](1, time.Second))
 		require.NoError(t, scraperErr)
+		scraper.topQueryBaselineSet = true
 		return scraper, mock
 	}
 
