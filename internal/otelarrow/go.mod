@@ -3,7 +3,7 @@ module github.com/open-telemetry/opentelemetry-collector-contrib/internal/otelar
 go 1.26.0
 
 require (
-	github.com/klauspost/compress v1.20.4
+	github.com/klauspost/compress v1.20.5
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/otelarrowexporter v0.165.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/otelarrowreceiver v0.165.1
 	github.com/open-telemetry/otel-arrow/go v0.60.2
